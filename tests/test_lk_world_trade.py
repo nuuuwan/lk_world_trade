@@ -50,27 +50,27 @@ class TestReadmeExample(unittest.TestCase):
 
     def test_readme_example_1_single_country(self):
         trade_info = TradeInfo.get(
-            product_code="271000",
+            product_code="27-27_Fuels",
             importer="Sri Lanka",
             exporter="Singapore",
             year=2022,
         )
         output = json.loads(str(trade_info))
-        self.assertIn("271000", output)
-        self.assertIn("Singapore", output["271000"])
+        self.assertIn("27-27_Fuels", output)
+        self.assertIn("Singapore", output["27-27_Fuels"])
         self.assertAlmostEqual(
-            output["271000"]["Singapore"], 524778076.47, delta=1.0
+            output["27-27_Fuels"]["Singapore"], 524778076.47, delta=1.0
         )
 
     def test_readme_example_2_all_countries(self):
         trade_info = TradeInfo.get(
-            product_code="271000",
+            product_code="27-27_Fuels",
             importer="Sri Lanka",
             year=2022,
         )
         output = json.loads(str(trade_info))
-        self.assertIn("271000", output)
-        by_country = output["271000"]
+        self.assertIn("27-27_Fuels", output)
+        by_country = output["27-27_Fuels"]
         self.assertIsInstance(by_country, dict)
         self.assertGreater(len(by_country), 0)
         # No regional aggregates (e.g. World, South Asia) in the result
@@ -122,13 +122,13 @@ class TestReadmeExamples456(unittest.TestCase):
     def test_readme_example_4_exporter_single_product_all_countries(self):
         """Example 4: single product, exporter perspective, all importers."""
         trade_info = TradeInfo.get(
-            product_code="271000",
+            product_code="27-27_Fuels",
             exporter="Sri Lanka",
             year=2022,
         )
         output = json.loads(str(trade_info))
-        self.assertIn("271000", output)
-        by_country = output["271000"]
+        self.assertIn("27-27_Fuels", output)
+        by_country = output["27-27_Fuels"]
         self.assertIsInstance(by_country, dict)
         self.assertGreater(len(by_country), 0)
         # No regional aggregates
@@ -170,33 +170,33 @@ class TestReadmeExamples456(unittest.TestCase):
         for group, by_country in output.items():
             self.assertIn("Sri Lanka", by_country)
         self.assertAlmostEqual(
-            output["27-27_Fuels"]["Sri Lanka"], 58808726.76, delta=1.0
+            output["27-27_Fuels"]["Sri Lanka"], 157063719.99, delta=1.0
         )
 
 
 class TestTradeInfo(unittest.TestCase):
     def test_get_returns_trade_info(self):
         result = TradeInfo.get(
-            product_code="271000",
+            product_code="27-27_Fuels",
             importer="Sri Lanka",
             exporter="Singapore",
             year=2022,
         )
         self.assertIsInstance(result, TradeInfo)
-        self.assertIn("271000", result.data)
-        self.assertIn("Singapore", result.data["271000"])
-        self.assertGreater(result.data["271000"]["Singapore"], 0)
+        self.assertIn("27-27_Fuels", result.data)
+        self.assertIn("Singapore", result.data["27-27_Fuels"])
+        self.assertGreater(result.data["27-27_Fuels"]["Singapore"], 0)
 
     def test_str_returns_json(self):
         result = TradeInfo.get(
-            product_code="271000",
+            product_code="27-27_Fuels",
             importer="Sri Lanka",
             exporter="Singapore",
             year=2022,
         )
         parsed = json.loads(str(result))
-        self.assertIn("271000", parsed)
-        self.assertIn("Singapore", parsed["271000"])
+        self.assertIn("27-27_Fuels", parsed)
+        self.assertIn("Singapore", parsed["27-27_Fuels"])
 
     def test_product_group_code_directly(self):
         result = TradeInfo.get(

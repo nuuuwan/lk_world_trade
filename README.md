@@ -12,7 +12,7 @@ This Python library is a wrapper for the World Bank's [WITS (World Integrated Tr
 from lk_world_trade import TradeInfo
 
 trade_info = TradeInfo.get(
-    product_code="271000",
+    product_code="27-27_Fuels",
     importer="Sri Lanka",
     exporter="Singapore",
     year=2022,
@@ -25,7 +25,7 @@ print(trade_info)
 ```JSON
 
 {
-    "271000": {
+    "27-27_Fuels": {
         "Singapore": 524778076.47
     }
 }
@@ -38,7 +38,7 @@ print(trade_info)
 from lk_world_trade import TradeInfo
 
 trade_info = TradeInfo.get(
-    product_code="271000",
+    product_code="27-27_Fuels",
     importer="Sri Lanka",
     year=2022,
 )
@@ -50,7 +50,7 @@ print(trade_info)
 ```JSON
 
 {
-    "271000": {
+    "27-27_Fuels": {
         "India": 1186061729.66,
         "Singapore": 524778076.47,
         ...
@@ -96,7 +96,7 @@ print(trade_info)
 from lk_world_trade import TradeInfo
 
 trade_info = TradeInfo.get(
-    product_code="271000",
+    product_code="27-27_Fuels",
     exporter="Sri Lanka",
     year=2022,
 )
@@ -108,7 +108,7 @@ print(trade_info)
 ```JSON
 
 {
-    "271000": {
+    "27-27_Fuels": {
         "United Arab Emirates": 71112771.06,
         "India": 58808726.76,
         ...
@@ -169,7 +169,7 @@ print(trade_info)
         "Sri Lanka": 12345678.0
     },
     "27-27_Fuels": {
-        "Sri Lanka": 58808726.76
+        "Sri Lanka": 157063719.99
     },
     ...
 }
