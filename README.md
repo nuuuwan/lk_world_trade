@@ -90,6 +90,92 @@ print(trade_info)
 
 ```
 
+### 4. Exports of a specific product to all countries
+
+```python
+from lk_world_trade import TradeInfo
+
+trade_info = TradeInfo.get(
+    product_code="271000",
+    exporter="Sri Lanka",
+    year=2022,
+)
+
+print(trade_info)
+
+```
+
+```JSON
+
+{
+    "271000": {
+        "United Arab Emirates": 71112771.06,
+        "India": 58808726.76,
+        ...
+    }
+}
+
+```
+
+### 5. All exports across all products and all countries
+
+```python
+from lk_world_trade import TradeInfo
+
+trade_info = TradeInfo.get(
+    exporter="Sri Lanka",
+    year=2022,
+)
+
+print(trade_info)
+
+```
+
+```JSON
+
+{
+    "01-05_Animal": {
+        "India": 12345678.0,
+        ...
+    },
+    "27-27_Fuels": {
+        "United Arab Emirates": 71112771.06,
+        ...
+    },
+    ...
+}
+
+```
+
+### 6. All trade between two specific countries across all products
+
+```python
+from lk_world_trade import TradeInfo
+
+trade_info = TradeInfo.get(
+    importer="India",
+    exporter="Sri Lanka",
+    year=2022,
+)
+
+print(trade_info)
+
+```
+
+```JSON
+
+{
+    "01-05_Animal": {
+        "Sri Lanka": 12345678.0
+    },
+    "27-27_Fuels": {
+        "Sri Lanka": 58808726.76
+    },
+    ...
+}
+
+```
+
 > **Note:** The WITS public API provides trade values at the HS-chapter sector
 > level. HS6 codes (e.g. `271000`) are automatically mapped to their WITS product
 > sector group (e.g. `27-27_Fuels`). Trade values are in USD.
