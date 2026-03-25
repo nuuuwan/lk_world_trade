@@ -2,6 +2,8 @@
 
 This Python library is a wrapper for the World Bank's [WITS (World Integrated Trade Solution)](https://wits.worldbank.org/) API, which provides data on a country's international trade with other nations.
 
+- WITS API Documentation: <https://wits.worldbank.org/data/public/WITSAPI_UserGuide.pdf>
+
 ## Example Use
 
 ```python
