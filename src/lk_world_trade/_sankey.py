@@ -359,3 +359,251 @@ class Sankey:
             title_text=title,
             png_path=png_path,
         )
+
+    @staticmethod
+    def draw_combined(
+        country: str, year: int, other_threshold: float = 0.02
+    ) -> go.Figure:
+        """Combined Sankey showing both imports and exports through ``country``.
+
+        Layout (5 columns):
+            Import source countries → Import products → Country → Export products → Export destination countries
+
+        The trade balance (surplus or deficit) is shown in the title and the
+        focal node label.
+        """
+        import_info = TradeInfo.get(importer=country, year=year)
+        export_info = TradeInfo.get(exporter=country, year=year)
+
+        raw_imports: dict[tuple[str, str], float] = {}
+        for product, by_country in import_info.data.items():
+            for c, value in by_country.items():
+                if value and value > 0:
+                    raw_imports[(product, c)] = (
+                        raw_imports.get((product, c), 0.0) + value
+                    )
+
+        raw_exports: dict[tuple[str, str], float] = {}
+        for product, by_country in export_info.data.items():
+            for c, value in by_country.items():
+                if value and value > 0:
+                    raw_exports[(product, c)] = (
+                        raw_exports.get((product, c), 0.0) + value
+                    )
+
+        total_imports = sum(raw_imports.values())
+        total_exports = sum(raw_exports.values())
+        if total_imports == 0 and total_exports == 0:
+            raise ValueError(f"No trade data found for {country} in {year}.")
+
+        balance = total_exports - total_imports  # positive = surplus
+
+        imp_threshold = other_threshold * total_imports
+        exp_threshold = other_threshold * total_exports
+
+        # ── Import-side aggregation ──────────────────────────────────────── #
+        imp_ctry_totals: dict[str, float] = {}
+        for (_, c), v in raw_imports.items():
+            imp_ctry_totals[c] = imp_ctry_totals.get(c, 0.0) + v
+
+        imp_prod_totals: dict[str, float] = {}
+        for (p, _), v in raw_imports.items():
+            imp_prod_totals[p] = imp_prod_totals.get(p, 0.0) + v
+
+        sig_ic = {c for c, v in imp_ctry_totals.items() if v >= imp_threshold}
+        has_other_ic = len(sig_ic) < len(imp_ctry_totals)
+        sig_ip = sorted(p for p, v in imp_prod_totals.items() if v >= imp_threshold)
+        has_other_ip = len(sig_ip) < len(imp_prod_totals)
+
+        # ── Export-side aggregation ──────────────────────────────────────── #
+        exp_ctry_totals: dict[str, float] = {}
+        for (_, c), v in raw_exports.items():
+            exp_ctry_totals[c] = exp_ctry_totals.get(c, 0.0) + v
+
+        exp_prod_totals: dict[str, float] = {}
+        for (p, _), v in raw_exports.items():
+            exp_prod_totals[p] = exp_prod_totals.get(p, 0.0) + v
+
+        sig_ec = {c for c, v in exp_ctry_totals.items() if v >= exp_threshold}
+        has_other_ec = len(sig_ec) < len(exp_ctry_totals)
+        sig_ep = sorted(p for p, v in exp_prod_totals.items() if v >= exp_threshold)
+        has_other_ep = len(sig_ep) < len(exp_prod_totals)
+
+        ic_sorted = sorted(sig_ic)
+        ec_sorted = sorted(sig_ec)
+
+        # ── Node index layout ────────────────────────────────────────────── #
+        # [imp_countries | Other_IC | imp_products | Other_IP |
+        #  focal | exp_products | Other_EP | exp_countries | Other_EC]
+        ic_base = 0
+        ic_idx = {c: ic_base + i for i, c in enumerate(ic_sorted)}
+        n_ic = len(ic_sorted)
+        other_ic_idx = n_ic if has_other_ic else None
+
+        ip_base = n_ic + (1 if has_other_ic else 0)
+        ip_idx = {p: ip_base + i for i, p in enumerate(sig_ip)}
+        n_ip = len(sig_ip)
+        other_ip_idx = ip_base + n_ip if has_other_ip else None
+
+        focal_idx = ip_base + n_ip + (1 if has_other_ip else 0)
+
+        ep_base = focal_idx + 1
+        ep_idx = {p: ep_base + i for i, p in enumerate(sig_ep)}
+        n_ep = len(sig_ep)
+        other_ep_idx = ep_base + n_ep if has_other_ep else None
+
+        ec_base = ep_base + n_ep + (1 if has_other_ep else 0)
+        ec_idx = {c: ec_base + i for i, c in enumerate(ec_sorted)}
+        n_ec = len(ec_sorted)
+        other_ec_idx = ec_base + n_ec if has_other_ec else None
+
+        # "Other" bucket totals (for label annotations)
+        other_ic_total = sum(
+            v for (_, c), v in raw_imports.items() if c not in sig_ic
+        )
+        other_ip_total = sum(
+            v for (p, _), v in raw_imports.items() if p not in set(sig_ip)
+        )
+        other_ep_total = sum(
+            v for (p, _), v in raw_exports.items() if p not in set(sig_ep)
+        )
+        other_ec_total = sum(
+            v for (_, c), v in raw_exports.items() if c not in sig_ec
+        )
+
+        imp_product_colors = {p: _product_color(p) for p in sig_ip}
+        exp_product_colors = {p: _product_color(p) for p in sig_ep}
+
+        # ── Node lists ───────────────────────────────────────────────────── #
+        node_labels = (
+            ic_sorted
+            + ([_OTHER_LABEL] if has_other_ic else [])
+            + [_product_label(p) for p in sig_ip]
+            + ([_OTHER_LABEL] if has_other_ip else [])
+            + [country]
+            + [_product_label(p) for p in sig_ep]
+            + ([_OTHER_LABEL] if has_other_ep else [])
+            + ec_sorted
+            + ([_OTHER_LABEL] if has_other_ec else [])
+        )
+        node_totals = (
+            [imp_ctry_totals[c] for c in ic_sorted]
+            + ([other_ic_total] if has_other_ic else [])
+            + [imp_prod_totals[p] for p in sig_ip]
+            + ([other_ip_total] if has_other_ip else [])
+            + [max(total_imports, total_exports)]
+            + [exp_prod_totals[p] for p in sig_ep]
+            + ([other_ep_total] if has_other_ep else [])
+            + [exp_ctry_totals[c] for c in ec_sorted]
+            + ([other_ec_total] if has_other_ec else [])
+        )
+        node_colors = (
+            ["#5577AA"] * n_ic
+            + ([_OTHER_COLOR] if has_other_ic else [])
+            + [imp_product_colors[p] for p in sig_ip]
+            + ([_OTHER_COLOR] if has_other_ip else [])
+            + ["#444444"]
+            + [exp_product_colors[p] for p in sig_ep]
+            + ([_OTHER_COLOR] if has_other_ep else [])
+            + ["#AA5555"] * n_ec
+            + ([_OTHER_COLOR] if has_other_ec else [])
+        )
+
+        node_labels_ann = [
+            f"{lbl} ({_fmt_musd(t)})"
+            for lbl, t in zip(node_labels, node_totals)
+        ]
+        # Override focal node label to show both sides and balance
+        balance_word = "Surplus" if balance >= 0 else "Deficit"
+        node_labels_ann[focal_idx] = (
+            f"{country} "
+            f"(In {_fmt_musd(total_imports)} / Out {_fmt_musd(total_exports)}"
+            f" / {balance_word} {_fmt_musd(abs(balance))})"
+        )
+
+        # ── Build links ──────────────────────────────────────────────────── #
+        link_acc: dict[tuple[int, int, str], float] = {}
+
+        # Import side: import_country → import_product → focal
+        for (product, c), value in raw_imports.items():
+            ic_node = ic_idx.get(c, other_ic_idx)
+            if product in ip_idx:
+                ip_node = ip_idx[product]
+                lp = "imp_" + product
+            else:
+                ip_node = other_ip_idx
+                lp = "imp_" + _OTHER_LABEL
+            k1 = (ic_node, ip_node, lp)
+            k2 = (ip_node, focal_idx, lp)
+            link_acc[k1] = link_acc.get(k1, 0.0) + value
+            link_acc[k2] = link_acc.get(k2, 0.0) + value
+
+        # Export side: focal → export_product → export_country
+        for (product, c), value in raw_exports.items():
+            ec_node = ec_idx.get(c, other_ec_idx)
+            if product in ep_idx:
+                ep_node = ep_idx[product]
+                lp = "exp_" + product
+            else:
+                ep_node = other_ep_idx
+                lp = "exp_" + _OTHER_LABEL
+            k1 = (focal_idx, ep_node, lp)
+            k2 = (ep_node, ec_node, lp)
+            link_acc[k1] = link_acc.get(k1, 0.0) + value
+            link_acc[k2] = link_acc.get(k2, 0.0) + value
+
+        sources, targets, values, link_colors = [], [], [], []
+        for (src, tgt, lp), value in link_acc.items():
+            sources.append(src)
+            targets.append(tgt)
+            values.append(value)
+            if lp.startswith("imp_"):
+                code = lp[4:]
+                color = imp_product_colors.get(code, _OTHER_COLOR)
+            else:
+                code = lp[4:]
+                color = exp_product_colors.get(code, _OTHER_COLOR)
+            link_colors.append(_rgba(color, 0.45))
+
+        # ── Title ────────────────────────────────────────────────────────── #
+        pct = int(other_threshold * 100)
+        balance_str = (
+            f"Trade {'Surplus' if balance >= 0 else 'Deficit'}: "
+            f"{_fmt_musd(abs(balance))}"
+        )
+        title = (
+            f"Trade Flows Through {country} ({year})  ·  {balance_str}<br>"
+            f"<sup>Import sources → Imports → {country} → Exports → Export destinations"
+            f"  ·  flows &lt;{pct}% of side total grouped as 'Other'</sup>"
+        )
+
+        safe = country.replace(" ", "_")
+        png_path = os.path.join(
+            os.path.normpath(_IMAGES_DIR),
+            f"sankey_combined_{safe}_{year}.png",
+        )
+
+        fig = go.Figure(
+            go.Sankey(
+                arrangement="snap",
+                node=dict(
+                    pad=15,
+                    thickness=20,
+                    label=node_labels_ann,
+                    color=node_colors,
+                ),
+                link=dict(
+                    source=sources,
+                    target=targets,
+                    value=values,
+                    color=link_colors,
+                ),
+            )
+        )
+        fig.update_layout(title_text=title, font_size=11)
+
+        images_dir = os.path.normpath(_IMAGES_DIR)
+        os.makedirs(images_dir, exist_ok=True)
+        fig.write_image(png_path, width=2400, height=1000, scale=2)
+        os.system(f"open {png_path}")
+        return fig
