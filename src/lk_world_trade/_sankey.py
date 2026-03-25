@@ -8,20 +8,20 @@ _IMAGES_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "images")
 
 # Semantic colors keyed by WITS sector group code
 _PRODUCT_COLORS: dict[str, str] = {
-    "01-05_Animal":    "#C8A05A",  # tan/leather – animal products
+    "01-05_Animal": "#C8A05A",  # tan/leather – animal products
     "06-15_Vegetable": "#4CAF50",  # green – vegetable/plant
-    "16-24_FoodProd":  "#FF9800",  # amber – processed food
-    "25-26_Minerals":  "#9E9E9E",  # stone grey – minerals/rock
-    "27-27_Fuels":     "#212121",  # near-black – coal/oil
+    "16-24_FoodProd": "#FF9800",  # amber – processed food
+    "25-26_Minerals": "#9E9E9E",  # stone grey – minerals/rock
+    "27-27_Fuels": "#212121",  # near-black – coal/oil
     "28-38_Chemicals": "#7986CB",  # indigo – chemicals/lab
     "39-40_PlastiRub": "#00BCD4",  # cyan – plastic/synthetic
     "41-43_HidesSkin": "#8D6E63",  # brown – hides/leather
-    "44-49_Wood":      "#795548",  # wood brown
+    "44-49_Wood": "#795548",  # wood brown
     "50-63_TextCloth": "#E91E63",  # pink/rose – textiles
-    "64-67_Footwear":  "#FF5722",  # deep orange – footwear
+    "64-67_Footwear": "#FF5722",  # deep orange – footwear
     "68-71_StoneGlas": "#B0BEC5",  # light grey-blue – glass/stone
-    "72-83_Metals":    "#607D8B",  # steel blue-grey – metals
-    "84-85_MachElec":  "#1565C0",  # deep blue – machinery/electronics
+    "72-83_Metals": "#607D8B",  # steel blue-grey – metals
+    "84-85_MachElec": "#1565C0",  # deep blue – machinery/electronics
     "86-89_Transport": "#F44336",  # red – transport
     "90-99_Miscellan": "#AB47BC",  # purple – miscellaneous
 }
@@ -29,20 +29,20 @@ _FALLBACK_COLOR = "#636EFA"
 
 # Human-readable short names for WITS sector groups
 _PRODUCT_LABELS: dict[str, str] = {
-    "01-05_Animal":    "Animal Products",
+    "01-05_Animal": "Animal Products",
     "06-15_Vegetable": "Vegetables",
-    "16-24_FoodProd":  "Food Products",
-    "25-26_Minerals":  "Minerals",
-    "27-27_Fuels":     "Fuels",
+    "16-24_FoodProd": "Food Products",
+    "25-26_Minerals": "Minerals",
+    "27-27_Fuels": "Fuels",
     "28-38_Chemicals": "Chemicals",
     "39-40_PlastiRub": "Plastics & Rubber",
     "41-43_HidesSkin": "Hides & Skins",
-    "44-49_Wood":      "Wood & Paper",
+    "44-49_Wood": "Wood & Paper",
     "50-63_TextCloth": "Textiles & Clothing",
-    "64-67_Footwear":  "Footwear",
+    "64-67_Footwear": "Footwear",
     "68-71_StoneGlas": "Stone & Glass",
-    "72-83_Metals":    "Metals",
-    "84-85_MachElec":  "Machinery & Electronics",
+    "72-83_Metals": "Metals",
+    "84-85_MachElec": "Machinery & Electronics",
     "86-89_Transport": "Transport Equipment",
     "90-99_Miscellan": "Miscellaneous",
 }
@@ -298,13 +298,13 @@ class Sankey:
 
         pct = int(other_threshold * 100)
         title = (
-            f"Trade Flows into {importer} ({year})<br>"
+            f"Import Flows into {importer} ({year})<br>"
             f"<sup>Exporter → Product group → Importer (USD)"
             f" · flows &lt;{pct}% of total grouped as 'Other'</sup>"
         )
         safe = importer.replace(" ", "_")
         png_path = os.path.join(
-            os.path.normpath(_IMAGES_DIR), f"sankey_{safe}_{year}.png"
+            os.path.normpath(_IMAGES_DIR), f"sankey_imports_{safe}_{year}.png"
         )
 
         return Sankey._render(

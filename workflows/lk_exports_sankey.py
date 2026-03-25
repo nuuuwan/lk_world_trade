@@ -9,7 +9,7 @@ _EXPORTERS = [
     "Sri Lanka",
 ]
 
-_YEARS = [2022]
+_YEARS = [2022, 2023]
 
 if __name__ == "__main__":
     for exporter in _EXPORTERS:
