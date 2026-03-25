@@ -13,7 +13,7 @@ trade_info = TradeInfo.get(
     product_code="271000",
     importer="Sri Lanka",
     exporter="Singapore",
-    year=2023,
+    year=2022,
 )
 
 print(trade_info)
@@ -26,11 +26,13 @@ print(trade_info)
     "product_code": "271000",
     "importer": "Sri Lanka",
     "exporter": "Singapore",
-    "year": 2023,
-    "product_description": "Petroleum oils, etc, (excl. crude); preparation",
-    "trade_value_usd": 2349473690,
-    "quantity": 3207960000,
-    "quantity_unit": "Kg"
+    "year": 2022,
+    "product_description": "Fuels and mineral oils (HS 27)",
+    "trade_value_usd": 524778076.47
 }
 
 ```
+
+> **Note:** The WITS public API provides trade values at the HS-chapter sector
+> level. HS6 codes (e.g. `271000`) are automatically mapped to their WITS product
+> sector group (e.g. `27-27_Fuels`). Trade values are in USD.

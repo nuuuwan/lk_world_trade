@@ -3,6 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+import json
 import unittest
 
 from lk_world_trade import TradeInfo
@@ -44,6 +45,25 @@ class TestProductMapping(unittest.TestCase):
             to_wits_product_group("INVALID")
 
 
+class TestReadmeExample(unittest.TestCase):
+    """Tests that the exact example from README.md works and returns expected output."""
+
+    def test_readme_example(self):
+        trade_info = TradeInfo.get(
+            product_code="271000",
+            importer="Sri Lanka",
+            exporter="Singapore",
+            year=2022,
+        )
+        output = json.loads(str(trade_info))
+        self.assertEqual(output["product_code"], "271000")
+        self.assertEqual(output["importer"], "Sri Lanka")
+        self.assertEqual(output["exporter"], "Singapore")
+        self.assertEqual(output["year"], 2022)
+        self.assertEqual(output["product_description"], "Fuels and mineral oils (HS 27)")
+        self.assertAlmostEqual(output["trade_value_usd"], 524778076.47, delta=1.0)
+
+
 class TestTradeInfo(unittest.TestCase):
     def test_get_returns_trade_info(self):
         result = TradeInfo.get(
@@ -67,11 +87,19 @@ class TestTradeInfo(unittest.TestCase):
             exporter="Singapore",
             year=2022,
         )
-        import json
-
         parsed = json.loads(str(result))
         self.assertIn("product_code", parsed)
         self.assertIn("trade_value_usd", parsed)
+
+    def test_product_group_code_directly(self):
+        result = TradeInfo.get(
+            product_code="Total",
+            importer="Sri Lanka",
+            exporter="Singapore",
+            year=2020,
+        )
+        self.assertIsNotNone(result.trade_value_usd)
+        self.assertGreater(result.trade_value_usd, 0)
 
 
 if __name__ == "__main__":
