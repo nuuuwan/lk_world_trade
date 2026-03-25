@@ -120,6 +120,11 @@ _WITS_SECTOR_GROUPS = set(_HS2_TO_WITS_SECTOR.values()) | {
 }
 
 
+def get_all_wits_sector_groups() -> list:
+    """Return all unique WITS sector group codes covering HS chapters 01-99, sorted."""
+    return sorted(set(_HS2_TO_WITS_SECTOR.values()))
+
+
 def to_wits_product_group(product_code: str) -> str:
     """Convert an HS6 code (e.g. '271000') to its WITS sector group (e.g. '27-27_Fuels').
 

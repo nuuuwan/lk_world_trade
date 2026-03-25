@@ -85,6 +85,37 @@ class TestReadmeExample(unittest.TestCase):
         )
 
 
+class TestReadmeExample3(unittest.TestCase):
+    """Tests Example 3: all trade (all products, all countries)."""
+
+    def test_readme_example_3_all_trade(self):
+        trade_info = TradeInfo.get(
+            importer="Sri Lanka",
+            year=2022,
+        )
+        output = json.loads(str(trade_info))
+        # Must return multiple product sector group keys, not a single 'Total'
+        self.assertGreater(len(output), 1)
+        self.assertNotIn("Total", output)
+        # Known sector groups that LKA actively trades in
+        self.assertIn("27-27_Fuels", output)
+        self.assertIn("84-85_MachElec", output)
+        self.assertIn("50-63_TextCloth", output)
+        # Each product group maps to a non-empty dict of countries
+        for group, by_country in output.items():
+            self.assertIsInstance(
+                by_country, dict, f"{group} value is not a dict"
+            )
+            self.assertGreater(len(by_country), 0, f"{group} has no countries")
+            # No regional aggregates
+            self.assertNotIn("World", by_country)
+            self.assertNotIn("South Asia", by_country)
+        # Spot-check a known value
+        self.assertAlmostEqual(
+            output["27-27_Fuels"]["India"], 1186061729.66, delta=1.0
+        )
+
+
 class TestTradeInfo(unittest.TestCase):
     def test_get_returns_trade_info(self):
         result = TradeInfo.get(

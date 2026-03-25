@@ -59,6 +59,37 @@ print(trade_info)
 
 ```
 
+### 3. All trade
+
+```python
+from lk_world_trade import TradeInfo
+
+trade_info = TradeInfo.get(
+    importer="Sri Lanka",
+    year=2022,
+)
+
+print(trade_info)
+
+```
+
+```JSON
+
+{
+    "01-05_Animal": {
+        "India": 45678901.23,
+        ...
+    },
+    "27-27_Fuels": {
+        "India": 1186061729.66,
+        "Singapore": 524778076.47,
+        ...
+    },
+    ...
+}
+
+```
+
 > **Note:** The WITS public API provides trade values at the HS-chapter sector
 > level. HS6 codes (e.g. `271000`) are automatically mapped to their WITS product
 > sector group (e.g. `27-27_Fuels`). Trade values are in USD.

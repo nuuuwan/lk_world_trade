@@ -4,7 +4,7 @@ from typing import Dict, Optional
 from utils import WWW
 
 from ._country import get_group_iso3_set, get_iso3
-from ._product import to_wits_product_group
+from ._product import get_all_wits_sector_groups, to_wits_product_group
 
 _WITS_SDMX_BASE = (
     "https://wits.worldbank.org/API/V1/SDMX/V21/datasource/tradestats-trade"
@@ -114,19 +114,20 @@ class TradeInfo:
     @classmethod
     def get(
         cls,
-        product_code: str,
         importer: str,
         year: int,
+        product_code: Optional[str] = None,
         exporter: Optional[str] = None,
     ) -> "TradeInfo":
         """Fetch trade data from the WITS API.
 
         Args:
-            product_code: An HS6 code (e.g. '271000') or a WITS product group
-                code (e.g. 'Total', '27-27_Fuels'). HS6 codes are mapped to
-                the appropriate WITS sector group.
             importer: Importing country name (e.g. 'Sri Lanka').
             year: Reference year (e.g. 2022).
+            product_code: An HS6 code (e.g. '271000') or a WITS product group
+                code (e.g. 'Total', '27-27_Fuels'). When omitted, fetches data
+                for all 16 HS-chapter sector groups. HS6 codes are mapped to
+                the appropriate WITS sector group.
             exporter: Exporting country name (e.g. 'Singapore'). When omitted,
                 returns values for all individual trading partners.
 
@@ -137,6 +138,35 @@ class TradeInfo:
             ValueError: If the country name or product code cannot be resolved.
         """
         importer_iso3 = get_iso3(importer)
+
+        if product_code is None:
+            # All products: iterate every WITS sector group
+            exporter_iso3 = (
+                get_iso3(exporter) if exporter is not None else None
+            )
+            data = {}
+            for group in get_all_wits_sector_groups():
+                if exporter_iso3 is None:
+                    by_country = _fetch_trade_value_by_country(
+                        reporter_iso3=importer_iso3,
+                        product_group=group,
+                        year=year,
+                        indicator="MPRT-TRD-VL",
+                    )
+                    if by_country:
+                        data[group] = by_country
+                else:
+                    value = _fetch_trade_value(
+                        reporter_iso3=importer_iso3,
+                        partner_iso3=exporter_iso3,
+                        product_group=group,
+                        year=year,
+                        indicator="MPRT-TRD-VL",
+                    )
+                    if value is not None:
+                        data[group] = {exporter: value}
+            return cls(data)
+
         wits_group = to_wits_product_group(product_code)
 
         if exporter is None:
@@ -157,5 +187,3 @@ class TradeInfo:
             indicator="MPRT-TRD-VL",
         )
         return cls({product_code: {exporter: trade_value}})
-
-
