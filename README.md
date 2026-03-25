@@ -4,7 +4,9 @@ This Python library is a wrapper for the World Bank's [WITS (World Integrated Tr
 
 - WITS API Documentation: <https://wits.worldbank.org/data/public/WITSAPI_UserGuide.pdf>
 
-## Example Use
+## Example Uses
+
+### 1. Trade with a single country for a specific product
 
 ```python
 from lk_world_trade import TradeInfo
@@ -30,6 +32,21 @@ print(trade_info)
     "product_description": "Fuels and mineral oils (HS 27)",
     "trade_value_usd": 524778076.47
 }
+
+```
+
+### 2. Trade for a specific product for all countries
+
+```python
+from lk_world_trade import TradeInfo
+
+trade_info = TradeInfo.get(
+    product_code="271000",
+    importer="Sri Lanka",
+    year=2022,
+)
+
+print(trade_info)
 
 ```
 
