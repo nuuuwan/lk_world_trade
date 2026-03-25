@@ -1,11 +1,10 @@
 import json
-from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from utils import WWW
 
 from ._country import get_group_iso3_set, get_iso3
-from ._product import product_group_description, to_wits_product_group
+from ._product import to_wits_product_group
 
 _WITS_SDMX_BASE = (
     "https://wits.worldbank.org/API/V1/SDMX/V21/datasource/tradestats-trade"
@@ -32,7 +31,6 @@ def _fetch_trade_value(
     try:
         content = WWW(url).read()
         data = json.loads(content)
-        # SDMX JSON structure: dataSets[0].series["0:0:0:0:0"].observations["0"][0]
         series = data["dataSets"][0]["series"]
         obs_key = next(iter(series))
         observations = series[obs_key]["observations"]
@@ -52,9 +50,9 @@ def _fetch_trade_value_by_country(
     product_group: str,
     year: int,
     indicator: str,
-) -> List[Dict[str, object]]:
-    """Query WITS SDMX API with partner=ALL and return a list of
-    {exporter, trade_value_usd} dicts sorted by trade_value_usd descending."""
+) -> Dict[str, float]:
+    """Query WITS SDMX API with partner=ALL and return {country_name: trade_value_usd}
+    for individual countries only (regional aggregates excluded)."""
     url = _WITS_SDMX_BASE.format(
         reporter=reporter_iso3,
         year=year,
@@ -65,7 +63,6 @@ def _fetch_trade_value_by_country(
     try:
         content = WWW(url).read()
         data = json.loads(content)
-        # SDMX JSON: structure.dimensions.series[2] is the PARTNER dimension
         structure = data["structure"]
         partner_dim = next(
             d
@@ -77,58 +74,42 @@ def _fetch_trade_value_by_country(
         ]  # [{"id": "SGP", "name": "Singapore"}, ...]
         series = data["dataSets"][0]["series"]
         group_iso3s = get_group_iso3_set()
-        results = []
+        result = {}
         for series_key, series_data in series.items():
-            # Key format: "0:0:<partner_index>:0:0"
             partner_index = int(series_key.split(":")[2])
             partner_entry = partner_values[partner_index]
-            partner_iso3 = partner_entry["id"]
-            if partner_iso3 in group_iso3s:
+            if partner_entry["id"] in group_iso3s:
                 continue  # skip regional/world aggregates
-            partner_name = partner_entry["name"]
             observations = series_data.get("observations", {})
             if not observations:
                 continue
-            obs_val_key = next(iter(observations))
-            raw = observations[obs_val_key][0]
+            raw = observations[next(iter(observations))][0]
             if raw is None:
                 continue
-            results.append(
-                {
-                    "exporter": partner_name,
-                    "trade_value_usd": float(raw) * 1000,
-                }
-            )
-        results.sort(key=lambda x: x["trade_value_usd"], reverse=True)
-        return results
+            result[partner_entry["name"]] = float(raw) * 1000
+        return result
     except Exception:
-        return []
+        return {}
 
 
-@dataclass
 class TradeInfo:
-    """Bilateral trade information for a product between two countries.
+    """Trade data for a product keyed by exporter country.
+
+    The internal structure is:  {product_code: {exporter: trade_value_usd}}
 
     Trade values are sourced from the World Bank WITS tradestats-trade dataset
     via the SDMX API (https://wits.worldbank.org).
 
     Note: The WITS public API provides trade values at the sector/product-group
     level. HS6 product codes are mapped to the corresponding WITS sector group
-    (e.g. '271000' → '27-27_Fuels').
+    (e.g. '271000' -> '27-27_Fuels').
     """
 
-    product_code: str
-    importer: str
-    exporter: Optional[str]
-    year: int
-    product_description: str
-    trade_value_usd: Optional[float]
-    trade_value_usd_by_country: Optional[List[Dict[str, object]]] = field(
-        default=None
-    )
+    def __init__(self, data: Dict[str, Dict[str, Optional[float]]]):
+        self.data = data
 
     def __str__(self) -> str:
-        return json.dumps(asdict(self), indent=4)
+        return json.dumps(self.data, indent=4)
 
     @classmethod
     def get(
@@ -138,7 +119,7 @@ class TradeInfo:
         year: int,
         exporter: Optional[str] = None,
     ) -> "TradeInfo":
-        """Fetch bilateral trade data from the WITS API.
+        """Fetch trade data from the WITS API.
 
         Args:
             product_code: An HS6 code (e.g. '271000') or a WITS product group
@@ -146,38 +127,27 @@ class TradeInfo:
                 the appropriate WITS sector group.
             importer: Importing country name (e.g. 'Sri Lanka').
             year: Reference year (e.g. 2022).
-            exporter: Exporting country name (e.g. 'Singapore'). When omitted
-                or None, returns the world-total import value ('World').
+            exporter: Exporting country name (e.g. 'Singapore'). When omitted,
+                returns values for all individual trading partners.
 
         Returns:
-            A TradeInfo instance with the import trade value.
+            A TradeInfo whose data is {product_code: {exporter: trade_value_usd}}.
 
         Raises:
             ValueError: If the country name or product code cannot be resolved.
         """
         importer_iso3 = get_iso3(importer)
         wits_group = to_wits_product_group(product_code)
-        description = product_group_description(wits_group)
 
         if exporter is None:
-            # All-countries mode: return per-country breakdown
             by_country = _fetch_trade_value_by_country(
                 reporter_iso3=importer_iso3,
                 product_group=wits_group,
                 year=year,
                 indicator="MPRT-TRD-VL",
             )
-            return cls(
-                product_code=product_code,
-                importer=importer,
-                exporter=None,
-                year=year,
-                product_description=description,
-                trade_value_usd=None,
-                trade_value_usd_by_country=by_country,
-            )
+            return cls({product_code: by_country})
 
-        # Single-country mode
         exporter_iso3 = get_iso3(exporter)
         trade_value = _fetch_trade_value(
             reporter_iso3=importer_iso3,
@@ -186,11 +156,6 @@ class TradeInfo:
             year=year,
             indicator="MPRT-TRD-VL",
         )
-        return cls(
-            product_code=product_code,
-            importer=importer,
-            exporter=exporter,
-            year=year,
-            product_description=description,
-            trade_value_usd=trade_value,
-        )
+        return cls({product_code: {exporter: trade_value}})
+
+

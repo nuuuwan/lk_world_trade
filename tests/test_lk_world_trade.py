@@ -56,15 +56,10 @@ class TestReadmeExample(unittest.TestCase):
             year=2022,
         )
         output = json.loads(str(trade_info))
-        self.assertEqual(output["product_code"], "271000")
-        self.assertEqual(output["importer"], "Sri Lanka")
-        self.assertEqual(output["exporter"], "Singapore")
-        self.assertEqual(output["year"], 2022)
-        self.assertEqual(
-            output["product_description"], "Fuels and mineral oils (HS 27)"
-        )
+        self.assertIn("271000", output)
+        self.assertIn("Singapore", output["271000"])
         self.assertAlmostEqual(
-            output["trade_value_usd"], 524778076.47, delta=1.0
+            output["271000"]["Singapore"], 524778076.47, delta=1.0
         )
 
     def test_readme_example_2_all_countries(self):
@@ -74,32 +69,19 @@ class TestReadmeExample(unittest.TestCase):
             year=2022,
         )
         output = json.loads(str(trade_info))
-        self.assertEqual(output["product_code"], "271000")
-        self.assertEqual(output["importer"], "Sri Lanka")
-        self.assertIsNone(output["exporter"])
-        self.assertEqual(output["year"], 2022)
-        self.assertEqual(
-            output["product_description"], "Fuels and mineral oils (HS 27)"
-        )
-        self.assertIsNone(output["trade_value_usd"])
-        by_country = output["trade_value_usd_by_country"]
-        self.assertIsInstance(by_country, list)
+        self.assertIn("271000", output)
+        by_country = output["271000"]
+        self.assertIsInstance(by_country, dict)
         self.assertGreater(len(by_country), 0)
-        # Each entry must have the expected keys
-        for entry in by_country:
-            self.assertIn("exporter", entry)
-            self.assertIn("trade_value_usd", entry)
-        # Results are sorted descending by trade_value_usd
-        values = [e["trade_value_usd"] for e in by_country]
-        self.assertEqual(values, sorted(values, reverse=True))
-        # No regional aggregates (e.g. World, South Asia) in the list
-        exporter_names = {e["exporter"] for e in by_country}
-        self.assertNotIn("World", exporter_names)
-        self.assertNotIn("South Asia", exporter_names)
+        # No regional aggregates (e.g. World, South Asia) in the result
+        self.assertNotIn("World", by_country)
+        self.assertNotIn("South Asia", by_country)
         # Top exporter for LKA fuels imports in 2022 is India
-        self.assertEqual(by_country[0]["exporter"], "India")
+        top_exporter = max(by_country, key=by_country.__getitem__)
+        self.assertEqual(top_exporter, "India")
+        self.assertAlmostEqual(by_country["India"], 1186061729.66, delta=1.0)
         self.assertAlmostEqual(
-            by_country[0]["trade_value_usd"], 1186061729.66, delta=1.0
+            by_country["Singapore"], 524778076.47, delta=1.0
         )
 
 
@@ -112,12 +94,9 @@ class TestTradeInfo(unittest.TestCase):
             year=2022,
         )
         self.assertIsInstance(result, TradeInfo)
-        self.assertEqual(result.product_code, "271000")
-        self.assertEqual(result.importer, "Sri Lanka")
-        self.assertEqual(result.exporter, "Singapore")
-        self.assertEqual(result.year, 2022)
-        self.assertIsNotNone(result.trade_value_usd)
-        self.assertGreater(result.trade_value_usd, 0)
+        self.assertIn("271000", result.data)
+        self.assertIn("Singapore", result.data["271000"])
+        self.assertGreater(result.data["271000"]["Singapore"], 0)
 
     def test_str_returns_json(self):
         result = TradeInfo.get(
@@ -127,8 +106,8 @@ class TestTradeInfo(unittest.TestCase):
             year=2022,
         )
         parsed = json.loads(str(result))
-        self.assertIn("product_code", parsed)
-        self.assertIn("trade_value_usd", parsed)
+        self.assertIn("271000", parsed)
+        self.assertIn("Singapore", parsed["271000"])
 
     def test_product_group_code_directly(self):
         result = TradeInfo.get(
@@ -137,8 +116,8 @@ class TestTradeInfo(unittest.TestCase):
             exporter="Singapore",
             year=2020,
         )
-        self.assertIsNotNone(result.trade_value_usd)
-        self.assertGreater(result.trade_value_usd, 0)
+        self.assertIn("Total", result.data)
+        self.assertGreater(result.data["Total"]["Singapore"], 0)
 
 
 if __name__ == "__main__":

@@ -25,12 +25,9 @@ print(trade_info)
 ```JSON
 
 {
-    "product_code": "271000",
-    "importer": "Sri Lanka",
-    "exporter": "Singapore",
-    "year": 2022,
-    "product_description": "Fuels and mineral oils (HS 27)",
-    "trade_value_usd": 524778076.47
+    "271000": {
+        "Singapore": 524778076.47
+    }
 }
 
 ```
@@ -53,17 +50,11 @@ print(trade_info)
 ```JSON
 
 {
-    "product_code": "271000",
-    "importer": "Sri Lanka",
-    "exporter": null,
-    "year": 2022,
-    "product_description": "Fuels and mineral oils (HS 27)",
-    "trade_value_usd": null,
-    "trade_value_usd_by_country": [
-        {"exporter": "India", "trade_value_usd": 1186061729.66},
-        {"exporter": "Singapore", "trade_value_usd": 524778076.47},
+    "271000": {
+        "India": 1186061729.66,
+        "Singapore": 524778076.47,
         ...
-    ]
+    }
 }
 
 ```
