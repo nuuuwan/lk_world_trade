@@ -37,138 +37,176 @@ def _rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
+def _fmt_musd(val: float) -> str:
+    """Format a USD value as a compact Million/Billion string."""
+    m = val / 1_000_000
+    if m >= 1000:
+        return f"${m / 1000:.1f}B"
+    return f"${m:.0f}M"
+
+
 class Sankey:
     """Sankey diagram visualisation of trade flows.
 
-    The diagram shows three levels, all links coloured by product group:
+    Both import and export diagrams share the same three-column layout:
 
-        exporter_country  →  product_group  →  importer
+        left  →  middle (product groups)  →  right
 
-    Countries whose total trade is below ``other_threshold`` × grand total are
-    collapsed into a single "Other" node.
+    For imports:  exporter countries  →  products  →  importer (single node)
+    For exports:  exporter (single node)  →  products  →  importer countries
+
+    Nodes below ``other_threshold`` × grand total are collapsed into "Other".
     """
 
     @staticmethod
-    def draw(
-        importer: str,
-        year: int,
-        other_threshold: float = 0.02,
+    def _render(
+        raw: dict,
+        focal_label: str,
+        country_is_left: bool,
+        grand_total: float,
+        other_threshold: float,
+        title_text: str,
+        png_path: str,
     ) -> go.Figure:
-        """Build and display a Sankey diagram of all imports.
-
-        Args:
-            importer: Importing country name (e.g. 'Sri Lanka').
-            year: Reference year (e.g. 2022).
-            other_threshold: Fraction of grand total below which a country is
-                grouped into "Other". Default 0.02 (2 %).
-
-        Returns:
-            A ``plotly.graph_objects.Figure`` that is shown in the browser and
-            saved as a PNG to the ``images/`` directory at the project root.
-        """
-        trade_info = TradeInfo.get(importer=importer, year=year)
-
-        # ------------------------------------------------------------------ #
-        # 1. Flatten raw flows: {(product, country): value}                   #
-        # ------------------------------------------------------------------ #
-        raw: dict[tuple[str, str], float] = {}
-        for product, by_country in trade_info.data.items():
-            for country, value in by_country.items():
-                if value and value > 0:
-                    raw[(product, country)] = (
-                        raw.get((product, country), 0.0) + value
-                    )
-
-        grand_total = sum(raw.values())
-        if grand_total == 0:
-            raise ValueError(f"No trade data found for {importer} in {year}.")
-
+        """Shared rendering logic for import and export Sankeys."""
         threshold_value = other_threshold * grand_total
 
-        # ------------------------------------------------------------------ #
-        # 2. Determine significant countries; rest → "Other"                  #
-        # ------------------------------------------------------------------ #
+        # Per-dimension totals
         country_totals: dict[str, float] = {}
         for (_, country), value in raw.items():
             country_totals[country] = country_totals.get(country, 0.0) + value
 
-        significant = {
-            c for c, v in country_totals.items() if v >= threshold_value
-        }
-        has_other = len(significant) < len(country_totals)
+        product_totals: dict[str, float] = {}
+        for (product, _), value in raw.items():
+            product_totals[product] = product_totals.get(product, 0.0) + value
 
-        # ------------------------------------------------------------------ #
-        # 3. Build node index                                                  #
-        # Node layout:                                                         #
-        #   0 … C-1   : significant exporter countries  (left)                #
-        #   C         : "Other" country node  (left, only if needed)          #
-        #   next P    : product groups  (middle)                               #
-        #   last      : importer  (right)                                      #
-        # ------------------------------------------------------------------ #
-        product_groups = sorted(trade_info.data.keys())
-        countries_sorted = sorted(significant)
+        # Threshold filtering
+        sig_countries = {c for c, v in country_totals.items() if v >= threshold_value}
+        has_other_country = len(sig_countries) < len(country_totals)
+        sig_products = sorted(p for p, v in product_totals.items() if v >= threshold_value)
+        has_other_product = len(sig_products) < len(product_totals)
 
+        countries_sorted = sorted(sig_countries)
         product_colors = {
-            p: _PALETTE[i % len(_PALETTE)]
-            for i, p in enumerate(product_groups)
+            p: _PALETTE[i % len(_PALETTE)] for i, p in enumerate(sig_products)
         }
 
-        c_idx = {c: i for i, c in enumerate(countries_sorted)}
-        other_idx = len(countries_sorted) if has_other else None
-        p_base = len(countries_sorted) + (1 if has_other else 0)
-        p_idx = {p: p_base + i for i, p in enumerate(product_groups)}
-        importer_idx = p_base + len(product_groups)
-
-        node_labels = (
-            countries_sorted
-            + ([_OTHER_LABEL] if has_other else [])
-            + product_groups
-            + [importer]
-        )
-        node_colors = (
-            ["#888888"] * len(countries_sorted)
-            + ([_OTHER_COLOR] if has_other else [])
-            + [product_colors[p] for p in product_groups]
-            + ["#444444"]
-        )
+        other_country_total = sum(v for (_, c), v in raw.items() if c not in sig_countries)
+        other_product_total = sum(v for (p, _), v in raw.items() if p not in set(sig_products))
 
         # ------------------------------------------------------------------ #
-        # 4. Build links                                                       #
+        # Node layout                                                          #
         #                                                                      #
-        # Both legs (exporter→product and product→importer) are coloured by   #
-        # product so every link inherits the product's colour end-to-end.     #
+        # imports (country_is_left=True):                                      #
+        #   [countries | Other_C | products | Other_P | focal]                #
+        #                                                                      #
+        # exports (country_is_left=False):                                     #
+        #   [focal | products | Other_P | countries | Other_C]                #
         # ------------------------------------------------------------------ #
-        # Accumulate into (src, tgt, product) → value to merge parallel edges
+        if country_is_left:
+            c_idx = {c: i for i, c in enumerate(countries_sorted)}
+            other_country_idx = len(countries_sorted) if has_other_country else None
+            p_base = len(countries_sorted) + (1 if has_other_country else 0)
+            p_idx = {p: p_base + i for i, p in enumerate(sig_products)}
+            other_product_idx = p_base + len(sig_products) if has_other_product else None
+            focal_idx = p_base + len(sig_products) + (1 if has_other_product else 0)
+
+            node_labels = (
+                countries_sorted
+                + ([_OTHER_LABEL] if has_other_country else [])
+                + sig_products
+                + (["Other Products"] if has_other_product else [])
+                + [focal_label]
+            )
+            node_totals = (
+                [country_totals[c] for c in countries_sorted]
+                + ([other_country_total] if has_other_country else [])
+                + [product_totals[p] for p in sig_products]
+                + ([other_product_total] if has_other_product else [])
+                + [grand_total]
+            )
+            node_colors = (
+                ["#888888"] * len(countries_sorted)
+                + ([_OTHER_COLOR] if has_other_country else [])
+                + [product_colors[p] for p in sig_products]
+                + ([_OTHER_COLOR] if has_other_product else [])
+                + ["#444444"]
+            )
+        else:
+            focal_idx = 0
+            p_idx = {p: 1 + i for i, p in enumerate(sig_products)}
+            other_product_idx = 1 + len(sig_products) if has_other_product else None
+            c_base = 1 + len(sig_products) + (1 if has_other_product else 0)
+            c_idx = {c: c_base + i for i, c in enumerate(countries_sorted)}
+            other_country_idx = c_base + len(countries_sorted) if has_other_country else None
+
+            node_labels = (
+                [focal_label]
+                + sig_products
+                + (["Other Products"] if has_other_product else [])
+                + countries_sorted
+                + ([_OTHER_LABEL] if has_other_country else [])
+            )
+            node_totals = (
+                [grand_total]
+                + [product_totals[p] for p in sig_products]
+                + ([other_product_total] if has_other_product else [])
+                + [country_totals[c] for c in countries_sorted]
+                + ([other_country_total] if has_other_country else [])
+            )
+            node_colors = (
+                ["#444444"]
+                + [product_colors[p] for p in sig_products]
+                + ([_OTHER_COLOR] if has_other_product else [])
+                + ["#888888"] * len(countries_sorted)
+                + ([_OTHER_COLOR] if has_other_country else [])
+            )
+
+        node_labels_ann = [
+            f"{lbl} ({_fmt_musd(t)})" for lbl, t in zip(node_labels, node_totals)
+        ]
+
+        # ------------------------------------------------------------------ #
+        # Build links                                                          #
+        # imports: country → product → focal                                  #
+        # exports: focal → product → country                                  #
+        # ------------------------------------------------------------------ #
         link_acc: dict[tuple[int, int, str], float] = {}
 
         for (product, country), value in raw.items():
-            country_node = c_idx.get(country, other_idx)  # significant or Other
+            country_node = c_idx.get(country, other_country_idx)
+            if product in p_idx:
+                product_node = p_idx[product]
+                link_product = product
+            else:
+                product_node = other_product_idx
+                link_product = _OTHER_LABEL
 
-            # Leg 1: exporter/Other → product
-            k1 = (country_node, p_idx[product], product)
+            if country_is_left:
+                k1 = (country_node, product_node, link_product)
+                k2 = (product_node, focal_idx, link_product)
+            else:
+                k1 = (focal_idx, product_node, link_product)
+                k2 = (product_node, country_node, link_product)
+
             link_acc[k1] = link_acc.get(k1, 0.0) + value
-
-            # Leg 2: product → importer  (same product colour)
-            k2 = (p_idx[product], importer_idx, product)
             link_acc[k2] = link_acc.get(k2, 0.0) + value
 
         sources, targets, values, link_colors = [], [], [], []
-        for (src, tgt, product), value in link_acc.items():
+        for (src, tgt, lp), value in link_acc.items():
             sources.append(src)
             targets.append(tgt)
             values.append(value)
-            link_colors.append(_rgba(product_colors[product], 0.45))
+            link_colors.append(_rgba(product_colors.get(lp, _OTHER_COLOR), 0.45))
 
-        # ------------------------------------------------------------------ #
-        # 5. Assemble figure                                                   #
-        # ------------------------------------------------------------------ #
+        # Assemble figure
         fig = go.Figure(
             go.Sankey(
                 arrangement="snap",
                 node=dict(
                     pad=15,
                     thickness=20,
-                    label=node_labels,
+                    label=node_labels_ann,
                     color=node_colors,
                 ),
                 link=dict(
@@ -179,23 +217,87 @@ class Sankey:
                 ),
             )
         )
-        pct = int(other_threshold * 100)
-        fig.update_layout(
-            title_text=(
-                f"Trade Flows into {importer} ({year})<br>"
-                f"<sup>Exporter → Product group → Importer (USD) "
-                f"· flows &lt;{pct}% of total grouped as 'Other'</sup>"
-            ),
-            font_size=11,
-        )
+        fig.update_layout(title_text=title_text, font_size=11)
 
         images_dir = os.path.normpath(_IMAGES_DIR)
         os.makedirs(images_dir, exist_ok=True)
-        safe_importer = importer.replace(" ", "_")
-        png_path = os.path.join(
-            images_dir, f"sankey_{safe_importer}_{year}.png"
-        )
         fig.write_image(png_path, width=1600, height=900, scale=2)
-
         os.system(f"open {png_path}")
         return fig
+
+    @staticmethod
+    def draw(importer: str, year: int, other_threshold: float = 0.02) -> go.Figure:
+        """Sankey of all imports into ``importer`` for ``year``.
+
+        Layout: Exporter countries → Product groups → Importer
+        """
+        trade_info = TradeInfo.get(importer=importer, year=year)
+
+        raw: dict[tuple[str, str], float] = {}
+        for product, by_country in trade_info.data.items():
+            for country, value in by_country.items():
+                if value and value > 0:
+                    raw[(product, country)] = raw.get((product, country), 0.0) + value
+
+        grand_total = sum(raw.values())
+        if grand_total == 0:
+            raise ValueError(f"No trade data found for {importer} in {year}.")
+
+        pct = int(other_threshold * 100)
+        title = (
+            f"Trade Flows into {importer} ({year})<br>"
+            f"<sup>Exporter → Product group → Importer (USD)"
+            f" · flows &lt;{pct}% of total grouped as 'Other'</sup>"
+        )
+        safe = importer.replace(" ", "_")
+        png_path = os.path.join(os.path.normpath(_IMAGES_DIR), f"sankey_{safe}_{year}.png")
+
+        return Sankey._render(
+            raw=raw,
+            focal_label=importer,
+            country_is_left=True,
+            grand_total=grand_total,
+            other_threshold=other_threshold,
+            title_text=title,
+            png_path=png_path,
+        )
+
+    @staticmethod
+    def draw_exports(exporter: str, year: int, other_threshold: float = 0.02) -> go.Figure:
+        """Sankey of all exports from ``exporter`` for ``year``.
+
+        Layout: Exporter → Product groups → Importer countries
+        """
+        trade_info = TradeInfo.get(exporter=exporter, year=year)
+
+        raw: dict[tuple[str, str], float] = {}
+        for product, by_country in trade_info.data.items():
+            for country, value in by_country.items():
+                if value and value > 0:
+                    raw[(product, country)] = raw.get((product, country), 0.0) + value
+
+        grand_total = sum(raw.values())
+        if grand_total == 0:
+            raise ValueError(f"No trade data found for {exporter} in {year}.")
+
+        pct = int(other_threshold * 100)
+        title = (
+            f"Export Flows from {exporter} ({year})<br>"
+            f"<sup>Exporter → Product group → Importer (USD)"
+            f" · flows &lt;{pct}% of total grouped as 'Other'</sup>"
+        )
+        safe = exporter.replace(" ", "_")
+        png_path = os.path.join(
+            os.path.normpath(_IMAGES_DIR), f"sankey_exports_{safe}_{year}.png"
+        )
+
+        return Sankey._render(
+            raw=raw,
+            focal_label=exporter,
+            country_is_left=False,
+            grand_total=grand_total,
+            other_threshold=other_threshold,
+            title_text=title,
+            png_path=png_path,
+        )
+

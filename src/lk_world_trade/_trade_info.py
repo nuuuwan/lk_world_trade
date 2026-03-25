@@ -3,7 +3,7 @@ from typing import Dict, Optional
 
 from utils import WWW
 
-from ._country import get_group_iso3_set, get_iso3
+from ._country import get_group_iso3_set, get_group_name_set, get_iso3
 from ._product import get_all_wits_sector_groups, to_wits_product_group
 
 _WITS_SDMX_BASE = (
@@ -74,11 +74,15 @@ def _fetch_trade_value_by_country(
         ]  # [{"id": "SGP", "name": "Singapore"}, ...]
         series = data["dataSets"][0]["series"]
         group_iso3s = get_group_iso3_set()
+        group_names = get_group_name_set()
         result = {}
         for series_key, series_data in series.items():
             partner_index = int(series_key.split(":")[2])
             partner_entry = partner_values[partner_index]
-            if partner_entry["id"] in group_iso3s:
+            if (
+                partner_entry["id"] in group_iso3s
+                or partner_entry["name"] in group_names
+            ):
                 continue  # skip regional/world aggregates
             observations = series_data.get("observations", {})
             if not observations:

@@ -36,6 +36,21 @@ def get_group_iso3_set() -> frozenset:
     return frozenset(groups)
 
 
+@functools.lru_cache(maxsize=1)
+def get_group_name_set() -> frozenset:
+    """Return the set of country names that are regional/group aggregates in WITS."""
+    content = WWW(_WITS_COUNTRY_URL).read()
+    root = ET.fromstring(content)
+    ns = {"wits": "http://wits.worldbank.org"}
+    groups = set()
+    for country in root.findall(".//wits:country", ns):
+        if country.get("isgroup", "No") == "Yes":
+            name = country.findtext("wits:name", default="", namespaces=ns)
+            if name:
+                groups.add(name)
+    return frozenset(groups)
+
+
 _WORLD_NAMES = {"world", "all", "wld"}
 _WORLD_ISO3 = "WLD"
 
