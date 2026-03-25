@@ -179,3 +179,28 @@ print(trade_info)
 > **Note:** The WITS public API provides trade values at the HS-chapter sector
 > level. HS6 codes (e.g. `271000`) are automatically mapped to their WITS product
 > sector group (e.g. `27-27_Fuels`). Trade values are in USD.
+
+## Visualisation
+
+### 7. Sankey diagram of all imports
+
+```python
+from lk_world_trade import Sankey
+
+Sankey.draw(
+    importer="Sri Lanka",
+    year=2022,
+    other_threshold=0.02,  # flows < 2% of total grouped as "Other"
+)
+
+```
+
+Generates an interactive Sankey diagram showing trade flows:
+
+```
+Product Group  ──►  Exporter Country  ──►  Sri Lanka
+```
+
+Each node width and link thickness is proportional to trade value (USD). The
+diagram opens in a browser window via Plotly and is saved as
+`images/sankey_Sri_Lanka_2022.png` in the project root.

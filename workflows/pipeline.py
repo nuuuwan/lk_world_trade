@@ -3,13 +3,17 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from lk_world_trade import TradeInfo
+from lk_world_trade import Sankey
+
+_IMPORTERS = [
+    "Sri Lanka",
+]
+
+_YEARS = [2022]
 
 if __name__ == "__main__":
-    trade_info = TradeInfo.get(
-        product_code="271000",
-        importer="Sri Lanka",
-        exporter="Singapore",
-        year=2022,
-    )
-    print(trade_info)
+    for importer in _IMPORTERS:
+        for year in _YEARS:
+            print(f"Generating Sankey for {importer} {year} ...")
+            Sankey.draw(importer=importer, year=year, other_threshold=0.01)
+            print(f"  Done.")
