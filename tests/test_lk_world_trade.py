@@ -60,8 +60,12 @@ class TestReadmeExample(unittest.TestCase):
         self.assertEqual(output["importer"], "Sri Lanka")
         self.assertEqual(output["exporter"], "Singapore")
         self.assertEqual(output["year"], 2022)
-        self.assertEqual(output["product_description"], "Fuels and mineral oils (HS 27)")
-        self.assertAlmostEqual(output["trade_value_usd"], 524778076.47, delta=1.0)
+        self.assertEqual(
+            output["product_description"], "Fuels and mineral oils (HS 27)"
+        )
+        self.assertAlmostEqual(
+            output["trade_value_usd"], 524778076.47, delta=1.0
+        )
 
 
 class TestTradeInfo(unittest.TestCase):
