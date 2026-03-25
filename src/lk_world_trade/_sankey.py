@@ -6,27 +6,57 @@ from ._trade_info import TradeInfo
 
 _IMAGES_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "images")
 
-_PALETTE = [
-    "#636EFA",
-    "#EF553B",
-    "#00CC96",
-    "#AB63FA",
-    "#FFA15A",
-    "#19D3F3",
-    "#FF6692",
-    "#B6E880",
-    "#FF97FF",
-    "#FECB52",
-    "#1F77B4",
-    "#FF7F0E",
-    "#2CA02C",
-    "#D62728",
-    "#9467BD",
-    "#8C564B",
-]
+# Semantic colors keyed by WITS sector group code
+_PRODUCT_COLORS: dict[str, str] = {
+    "01-05_Animal":    "#C8A05A",  # tan/leather – animal products
+    "06-15_Vegetable": "#4CAF50",  # green – vegetable/plant
+    "16-24_FoodProd":  "#FF9800",  # amber – processed food
+    "25-26_Minerals":  "#9E9E9E",  # stone grey – minerals/rock
+    "27-27_Fuels":     "#212121",  # near-black – coal/oil
+    "28-38_Chemicals": "#7986CB",  # indigo – chemicals/lab
+    "39-40_PlastiRub": "#00BCD4",  # cyan – plastic/synthetic
+    "41-43_HidesSkin": "#8D6E63",  # brown – hides/leather
+    "44-49_Wood":      "#795548",  # wood brown
+    "50-63_TextCloth": "#E91E63",  # pink/rose – textiles
+    "64-67_Footwear":  "#FF5722",  # deep orange – footwear
+    "68-71_StoneGlas": "#B0BEC5",  # light grey-blue – glass/stone
+    "72-83_Metals":    "#607D8B",  # steel blue-grey – metals
+    "84-85_MachElec":  "#1565C0",  # deep blue – machinery/electronics
+    "86-89_Transport": "#F44336",  # red – transport
+    "90-99_Miscellan": "#AB47BC",  # purple – miscellaneous
+}
+_FALLBACK_COLOR = "#636EFA"
+
+# Human-readable short names for WITS sector groups
+_PRODUCT_LABELS: dict[str, str] = {
+    "01-05_Animal":    "Animal Products",
+    "06-15_Vegetable": "Vegetables",
+    "16-24_FoodProd":  "Food Products",
+    "25-26_Minerals":  "Minerals",
+    "27-27_Fuels":     "Fuels",
+    "28-38_Chemicals": "Chemicals",
+    "39-40_PlastiRub": "Plastics & Rubber",
+    "41-43_HidesSkin": "Hides & Skins",
+    "44-49_Wood":      "Wood & Paper",
+    "50-63_TextCloth": "Textiles & Clothing",
+    "64-67_Footwear":  "Footwear",
+    "68-71_StoneGlas": "Stone & Glass",
+    "72-83_Metals":    "Metals",
+    "84-85_MachElec":  "Machinery & Electronics",
+    "86-89_Transport": "Transport Equipment",
+    "90-99_Miscellan": "Miscellaneous",
+}
 
 _OTHER_LABEL = "Other"
 _OTHER_COLOR = "#AAAAAA"
+
+
+def _product_color(code: str) -> str:
+    return _PRODUCT_COLORS.get(code, _FALLBACK_COLOR)
+
+
+def _product_label(code: str) -> str:
+    return _PRODUCT_LABELS.get(code, code)
 
 
 def _rgba(hex_color: str, alpha: float) -> str:
@@ -81,18 +111,24 @@ class Sankey:
             product_totals[product] = product_totals.get(product, 0.0) + value
 
         # Threshold filtering
-        sig_countries = {c for c, v in country_totals.items() if v >= threshold_value}
+        sig_countries = {
+            c for c, v in country_totals.items() if v >= threshold_value
+        }
         has_other_country = len(sig_countries) < len(country_totals)
-        sig_products = sorted(p for p, v in product_totals.items() if v >= threshold_value)
+        sig_products = sorted(
+            p for p, v in product_totals.items() if v >= threshold_value
+        )
         has_other_product = len(sig_products) < len(product_totals)
 
         countries_sorted = sorted(sig_countries)
-        product_colors = {
-            p: _PALETTE[i % len(_PALETTE)] for i, p in enumerate(sig_products)
-        }
+        product_colors = {p: _product_color(p) for p in sig_products}
 
-        other_country_total = sum(v for (_, c), v in raw.items() if c not in sig_countries)
-        other_product_total = sum(v for (p, _), v in raw.items() if p not in set(sig_products))
+        other_country_total = sum(
+            v for (_, c), v in raw.items() if c not in sig_countries
+        )
+        other_product_total = sum(
+            v for (p, _), v in raw.items() if p not in set(sig_products)
+        )
 
         # ------------------------------------------------------------------ #
         # Node layout                                                          #
@@ -105,16 +141,22 @@ class Sankey:
         # ------------------------------------------------------------------ #
         if country_is_left:
             c_idx = {c: i for i, c in enumerate(countries_sorted)}
-            other_country_idx = len(countries_sorted) if has_other_country else None
+            other_country_idx = (
+                len(countries_sorted) if has_other_country else None
+            )
             p_base = len(countries_sorted) + (1 if has_other_country else 0)
             p_idx = {p: p_base + i for i, p in enumerate(sig_products)}
-            other_product_idx = p_base + len(sig_products) if has_other_product else None
-            focal_idx = p_base + len(sig_products) + (1 if has_other_product else 0)
+            other_product_idx = (
+                p_base + len(sig_products) if has_other_product else None
+            )
+            focal_idx = (
+                p_base + len(sig_products) + (1 if has_other_product else 0)
+            )
 
             node_labels = (
                 countries_sorted
                 + ([_OTHER_LABEL] if has_other_country else [])
-                + sig_products
+                + [_product_label(p) for p in sig_products]
                 + (["Other Products"] if has_other_product else [])
                 + [focal_label]
             )
@@ -135,14 +177,18 @@ class Sankey:
         else:
             focal_idx = 0
             p_idx = {p: 1 + i for i, p in enumerate(sig_products)}
-            other_product_idx = 1 + len(sig_products) if has_other_product else None
+            other_product_idx = (
+                1 + len(sig_products) if has_other_product else None
+            )
             c_base = 1 + len(sig_products) + (1 if has_other_product else 0)
             c_idx = {c: c_base + i for i, c in enumerate(countries_sorted)}
-            other_country_idx = c_base + len(countries_sorted) if has_other_country else None
+            other_country_idx = (
+                c_base + len(countries_sorted) if has_other_country else None
+            )
 
             node_labels = (
                 [focal_label]
-                + sig_products
+                + [_product_label(p) for p in sig_products]
                 + (["Other Products"] if has_other_product else [])
                 + countries_sorted
                 + ([_OTHER_LABEL] if has_other_country else [])
@@ -163,7 +209,8 @@ class Sankey:
             )
 
         node_labels_ann = [
-            f"{lbl} ({_fmt_musd(t)})" for lbl, t in zip(node_labels, node_totals)
+            f"{lbl} ({_fmt_musd(t)})"
+            for lbl, t in zip(node_labels, node_totals)
         ]
 
         # ------------------------------------------------------------------ #
@@ -197,7 +244,9 @@ class Sankey:
             sources.append(src)
             targets.append(tgt)
             values.append(value)
-            link_colors.append(_rgba(product_colors.get(lp, _OTHER_COLOR), 0.45))
+            link_colors.append(
+                _rgba(product_colors.get(lp, _OTHER_COLOR), 0.45)
+            )
 
         # Assemble figure
         fig = go.Figure(
@@ -226,7 +275,9 @@ class Sankey:
         return fig
 
     @staticmethod
-    def draw(importer: str, year: int, other_threshold: float = 0.02) -> go.Figure:
+    def draw(
+        importer: str, year: int, other_threshold: float = 0.02
+    ) -> go.Figure:
         """Sankey of all imports into ``importer`` for ``year``.
 
         Layout: Exporter countries → Product groups → Importer
@@ -237,7 +288,9 @@ class Sankey:
         for product, by_country in trade_info.data.items():
             for country, value in by_country.items():
                 if value and value > 0:
-                    raw[(product, country)] = raw.get((product, country), 0.0) + value
+                    raw[(product, country)] = (
+                        raw.get((product, country), 0.0) + value
+                    )
 
         grand_total = sum(raw.values())
         if grand_total == 0:
@@ -250,7 +303,9 @@ class Sankey:
             f" · flows &lt;{pct}% of total grouped as 'Other'</sup>"
         )
         safe = importer.replace(" ", "_")
-        png_path = os.path.join(os.path.normpath(_IMAGES_DIR), f"sankey_{safe}_{year}.png")
+        png_path = os.path.join(
+            os.path.normpath(_IMAGES_DIR), f"sankey_{safe}_{year}.png"
+        )
 
         return Sankey._render(
             raw=raw,
@@ -263,7 +318,9 @@ class Sankey:
         )
 
     @staticmethod
-    def draw_exports(exporter: str, year: int, other_threshold: float = 0.02) -> go.Figure:
+    def draw_exports(
+        exporter: str, year: int, other_threshold: float = 0.02
+    ) -> go.Figure:
         """Sankey of all exports from ``exporter`` for ``year``.
 
         Layout: Exporter → Product groups → Importer countries
@@ -274,7 +331,9 @@ class Sankey:
         for product, by_country in trade_info.data.items():
             for country, value in by_country.items():
                 if value and value > 0:
-                    raw[(product, country)] = raw.get((product, country), 0.0) + value
+                    raw[(product, country)] = (
+                        raw.get((product, country), 0.0) + value
+                    )
 
         grand_total = sum(raw.values())
         if grand_total == 0:
@@ -300,4 +359,3 @@ class Sankey:
             title_text=title,
             png_path=png_path,
         )
-
