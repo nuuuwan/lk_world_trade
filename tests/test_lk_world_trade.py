@@ -46,9 +46,9 @@ class TestProductMapping(unittest.TestCase):
 
 
 class TestReadmeExample(unittest.TestCase):
-    """Tests that the exact example from README.md works and returns expected output."""
+    """Tests that the exact examples from README.md work and return expected output."""
 
-    def test_readme_example(self):
+    def test_readme_example_1_single_country(self):
         trade_info = TradeInfo.get(
             product_code="271000",
             importer="Sri Lanka",
@@ -65,6 +65,41 @@ class TestReadmeExample(unittest.TestCase):
         )
         self.assertAlmostEqual(
             output["trade_value_usd"], 524778076.47, delta=1.0
+        )
+
+    def test_readme_example_2_all_countries(self):
+        trade_info = TradeInfo.get(
+            product_code="271000",
+            importer="Sri Lanka",
+            year=2022,
+        )
+        output = json.loads(str(trade_info))
+        self.assertEqual(output["product_code"], "271000")
+        self.assertEqual(output["importer"], "Sri Lanka")
+        self.assertIsNone(output["exporter"])
+        self.assertEqual(output["year"], 2022)
+        self.assertEqual(
+            output["product_description"], "Fuels and mineral oils (HS 27)"
+        )
+        self.assertIsNone(output["trade_value_usd"])
+        by_country = output["trade_value_usd_by_country"]
+        self.assertIsInstance(by_country, list)
+        self.assertGreater(len(by_country), 0)
+        # Each entry must have the expected keys
+        for entry in by_country:
+            self.assertIn("exporter", entry)
+            self.assertIn("trade_value_usd", entry)
+        # Results are sorted descending by trade_value_usd
+        values = [e["trade_value_usd"] for e in by_country]
+        self.assertEqual(values, sorted(values, reverse=True))
+        # No regional aggregates (e.g. World, South Asia) in the list
+        exporter_names = {e["exporter"] for e in by_country}
+        self.assertNotIn("World", exporter_names)
+        self.assertNotIn("South Asia", exporter_names)
+        # Top exporter for LKA fuels imports in 2022 is India
+        self.assertEqual(by_country[0]["exporter"], "India")
+        self.assertAlmostEqual(
+            by_country[0]["trade_value_usd"], 1186061729.66, delta=1.0
         )
 
 

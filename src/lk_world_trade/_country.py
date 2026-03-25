@@ -21,13 +21,35 @@ def _get_country_map():
     return country_map
 
 
+@functools.lru_cache(maxsize=1)
+def get_group_iso3_set() -> frozenset:
+    """Return the set of ISO3 codes that are regional/group aggregates in WITS."""
+    content = WWW(_WITS_COUNTRY_URL).read()
+    root = ET.fromstring(content)
+    ns = {"wits": "http://wits.worldbank.org"}
+    groups = set()
+    for country in root.findall(".//wits:country", ns):
+        if country.get("isgroup", "No") == "Yes":
+            iso3 = country.findtext("wits:iso3Code", default="", namespaces=ns)
+            if iso3:
+                groups.add(iso3)
+    return frozenset(groups)
+
+
+_WORLD_NAMES = {"world", "all", "wld"}
+_WORLD_ISO3 = "WLD"
+
+
 def get_iso3(country_name: str) -> str:
     """Look up ISO3 code for a country name.
 
+    Pass 'World' (or 'All' / 'WLD') to get the world-total partner code.
     Raises ValueError if not found.
     """
-    country_map = _get_country_map()
     key = country_name.strip().lower()
+    if key in _WORLD_NAMES:
+        return _WORLD_ISO3
+    country_map = _get_country_map()
     if key in country_map:
         return country_map[key]
     # Partial match fallback
