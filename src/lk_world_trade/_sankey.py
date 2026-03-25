@@ -412,7 +412,9 @@ class Sankey:
 
         sig_ic = {c for c, v in imp_ctry_totals.items() if v >= imp_threshold}
         has_other_ic = len(sig_ic) < len(imp_ctry_totals)
-        sig_ip = sorted(p for p, v in imp_prod_totals.items() if v >= imp_threshold)
+        sig_ip = sorted(
+            p for p, v in imp_prod_totals.items() if v >= imp_threshold
+        )
         has_other_ip = len(sig_ip) < len(imp_prod_totals)
 
         # ── Export-side aggregation ──────────────────────────────────────── #
@@ -426,7 +428,9 @@ class Sankey:
 
         sig_ec = {c for c, v in exp_ctry_totals.items() if v >= exp_threshold}
         has_other_ec = len(sig_ec) < len(exp_ctry_totals)
-        sig_ep = sorted(p for p, v in exp_prod_totals.items() if v >= exp_threshold)
+        sig_ep = sorted(
+            p for p, v in exp_prod_totals.items() if v >= exp_threshold
+        )
         has_other_ep = len(sig_ep) < len(exp_prod_totals)
 
         ic_sorted = sorted(sig_ic)
